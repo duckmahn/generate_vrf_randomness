@@ -6,7 +6,6 @@ declare_id!("XAcs9KPMLSbtTaD6PEcVHwkcrgfGDY5D3ZroRBwhiFX");
 pub mod random_number {
     use super::*;
 
-    // 1. NEW: Initialize the game accounts
     pub fn initialize(ctx: Context<Initialize>, min: u64, max: u64) -> Result<()> {
         let range = &mut ctx.accounts.range;
         range.from = min;
@@ -18,15 +17,15 @@ pub mod random_number {
         Ok(())
     }
 
-    // 2. YOUR ORIGINAL LOGIC (Unchanged)
     pub fn random_number(ctx: Context<ConsumeRandomness>) -> Result<()> {
         let randomness_account = &ctx.accounts.randomness_account;
         let range = &ctx.accounts.range;
         let game_state = &mut ctx.accounts.game_state;
-        let clock = Clock::get()?;
 
         let randomness_data = RandomnessAccountData::parse(randomness_account.data.borrow())
             .map_err(|_| error!(GameError::InvalidSwitchboardAccount))?;
+
+        let clock = Clock::get()?;
 
         // Check if randomness is revealed for the current slot
         let random_value = randomness_data
@@ -36,7 +35,7 @@ pub mod random_number {
         let random_int = u64::from_le_bytes(random_value[0..8].try_into().unwrap());
 
         // Calculate winner
-        let result = (random_int % (range.to - range.from + 1)) + range.from;
+        let result = (random_int % (range.to - range.from)) + range.from;
         game_state.result = result;
 
         msg!("The winning number is: {:?}", result);

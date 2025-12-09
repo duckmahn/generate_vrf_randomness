@@ -36,8 +36,6 @@ describe("random_number", () => {
     );
     switchboardProgram = new anchor.Program(switchboardIdl, provider);
 
-    console.log("🚀 ~ ON_DEMAND_DEVNET_PID:", ON_DEMAND_DEVNET_PID);
-    console.log("🚀 ~ ON_DEMAND_DEVNET_QUEUE:", ON_DEMAND_DEVNET_QUEUE);
     console.log("Setup complete. Running tests on Devnet.");
     console.log("Your wallet:", provider.wallet.publicKey.toString());
     console.log("Your program:", program.programId.toString());
@@ -46,7 +44,7 @@ describe("random_number", () => {
 
   // Test Params
   const MIN = new anchor.BN(1);
-  const MAX = new anchor.BN(100);
+  const MAX = new anchor.BN(10000);
 
   it("Step 1: Initialize Game Accounts", async () => {
     await program.methods
@@ -122,7 +120,7 @@ describe("random_number", () => {
 
     const createTx = await provider.sendAndConfirm(
       new Transaction().add(commitIx),
-      [rngKp]
+      [provider.wallet.payer]
     );
     console.log(`Randomness Committed: ${createTx}`);
 
