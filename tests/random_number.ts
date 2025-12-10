@@ -6,12 +6,7 @@ import {
   ON_DEMAND_DEVNET_PID,
   ON_DEMAND_DEVNET_QUEUE,
 } from "@switchboard-xyz/on-demand";
-import {
-  Keypair,
-  SystemProgram,
-  Transaction,
-  PublicKey,
-} from "@solana/web3.js";
+import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 import { assert } from "chai";
 import * as sb from "@switchboard-xyz/on-demand";
 

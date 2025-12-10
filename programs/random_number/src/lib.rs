@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use switchboard_on_demand::{RandomnessAccountData, ON_DEMAND_DEVNET_PID};
+use switchboard_on_demand::RandomnessAccountData;
 
 declare_id!("XAcs9KPMLSbtTaD6PEcVHwkcrgfGDY5D3ZroRBwhiFX");
 #[program]
@@ -10,9 +10,14 @@ pub mod random_number {
         let range = &mut ctx.accounts.range;
         range.from = min;
         range.to = max;
-
+        let signer = &ctx.accounts.user;
         // Initialize result to 0
         ctx.accounts.game_state.result = 0;
+
+        if signer.to_account_info().get_lamports() < 100_000 {
+            return Err(GameError::NotEnoughLamports)?;
+        }
+
         msg!("Game Initialized: Range {}-{}", min, max);
         Ok(())
     }
@@ -26,6 +31,16 @@ pub mod random_number {
             .map_err(|_| error!(GameError::InvalidSwitchboardAccount))?;
 
         let clock = Clock::get()?;
+        if randomness_data.seed_slot > clock.slot {
+            return Err(GameError::RandomnessAlreadyRevealed.into());
+        }
+
+        if randomness_data.seed_slot == game_state.last_consumed_slot {
+            return Err(GameError::RandomnessAlreadyRevealed.into());
+        }
+        if randomness_data.seed_slot < clock.slot - 1000 {
+            return Err(GameError::RandomnessTooOld.into());
+        }
 
         // Check if randomness is revealed for the current slot
         let random_value = randomness_data
@@ -35,7 +50,8 @@ pub mod random_number {
         let random_int = u64::from_le_bytes(random_value[0..8].try_into().unwrap());
 
         // Calculate winner
-        let result = (random_int % (range.to - range.from)) + range.from;
+        let result = (random_int % (range.to - range.from + 1)) + range.from;
+        game_state.last_consumed_slot = randomness_data.seed_slot;
         game_state.result = result;
 
         msg!("The winning number is: {:?}", result);
@@ -47,8 +63,10 @@ pub mod random_number {
 pub struct Initialize<'info> {
     #[account(init, payer = user, space = 8 + 8 + 8)] // Discriminator + u64 + u64
     pub range: Account<'info, Range>,
-    #[account(init, payer = user, space = 8 + 8)] // Discriminator + u64
+
+    #[account(init, payer = user, space = 8 + 8 + 8)] // Discriminator + u64 + u64
     pub game_state: Account<'info, GameState>,
+
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -58,8 +76,7 @@ pub struct Initialize<'info> {
 pub struct ConsumeRandomness<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-    /// CHECK: Validated inside the instruction
-    #[account(owner = ON_DEMAND_DEVNET_PID)]
+    /// CHECK: The account's data is validated manually within the handler.
     pub randomness_account: AccountInfo<'info>,
     pub range: Account<'info, Range>,
     #[account(mut)]
@@ -70,6 +87,7 @@ pub struct ConsumeRandomness<'info> {
 #[account]
 pub struct GameState {
     pub result: u64,
+    pub last_consumed_slot: u64,
 }
 
 #[account]
@@ -84,4 +102,10 @@ pub enum GameError {
     InvalidSwitchboardAccount,
     #[msg("The randomness has not been resolved yet.")]
     RandomnessNotResolved,
+    #[msg("Not enough lamports")]
+    NotEnoughLamports,
+    #[msg("Randomness already revealed")]
+    RandomnessAlreadyRevealed,
+    #[msg("Randomness too old")]
+    RandomnessTooOld,
 }
